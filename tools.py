@@ -249,14 +249,16 @@ if __name__ == '__main__':
     from sklearn.metrics.pairwise import cosine_similarity
     from itertools import combinations
 
-    pairs = list(combinations(enumerate(df['text']), 2))
-    combos = [(a[0], b[0]) for a, b in pairs]
-    phrases = [(a[1], b[1]) for a, b in pairs]
-    results = [
-        cosine_similarity([np.array(df_tfidf.iloc[a])], [np.array(df_tfidf.iloc[b])])[0][0] \
-        for a,b in combos
-    ]
 
-    with open('/Users/sculla/PycharmProjects/project4/data/test.pkl', 'wb') as f:
-        pickle.dump(results, f)
-    print('whaaaa')
+
+    # pairs = list(combinations(enumerate(df['text']), 2))
+    # combos = [(a[0], b[0]) for a, b in pairs]
+    # phrases = [(a[1], b[1]) for a, b in pairs]
+    # results = [
+    #     cosine_similarity([np.array(df_tfidf.iloc[a])], [np.array(df_tfidf.iloc[b])])[0][0] \
+    #     for a,b in combos
+    # ]
+    #
+    # with open('/Users/sculla/PycharmProjects/project4/data/test.pkl', 'wb') as f:
+    #     pickle.dump(results, f)
+    # print('whaaaa')
