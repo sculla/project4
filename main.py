@@ -14,25 +14,78 @@ from sklearn.neighbors import NearestNeighbors
 import pickle
 import os
 import matplotlib.pyplot as plt
+import plotly.graph_objs as go
+from plotly.offline import plot
+from sklearn.linear_model import LogisticRegressionCV
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics.classification import classification_report
+from sklearn.ensemble import GradientBoostingClassifier
+
 
 def test_two():
     books = [
-        'data/Dance Dance Dance_df.pkl',
-        'data/Norwegian Wood_df.pkl',
-        'data/The Elephant Vanishes_df.pkl',
-        'data/Wild Sheep Chase_df.pkl',
-        'data/Wind_Pinball_df.pkl']
+        'data/Dance Dance Dance_df.pkl', #novel
+        'data/Norwegian Wood_df.pkl', # novel
+        'data/The Elephant Vanishes_df.pkl', # short stories
+        'data/Wild Sheep Chase_df.pkl', # novel
+        'data/Wind_Pinball_df.pkl'] # 2 novelas
     df_full = pd.DataFrame()
     for idx, book in enumerate(books):
         df_intermed = pd.read_pickle(book)
         print(df_intermed.shape, df_full.shape)
         df_full = pd.concat([df_full,df_intermed], axis=0)
     print(df_full.shape)
+    #todo min doc and max doc for tfidf
     cv_tfidf = TfidfVectorizer(max_features=5000)
     X_tfidf = cv_tfidf.fit_transform(df_full['text']).toarray()
-    target = df_full['translator']
+    df_full.reset_index(drop=True, inplace=True)
 
-    return X_tfidf, target
+    # Reduction of features
+    #TODO replace SVD with UMAP see: https://umap-learn.readthedocs.io/en/latest/benchmarking.html
+    lsa = TruncatedSVD(50)
+    doc_topic = lsa.fit_transform(X_tfidf)
+
+    # Topic graph
+    tsne = TSNE(n_components=2, verbose=1, perplexity=40, n_iter=300)
+    doc_topic_tsne = pd.DataFrame(tsne.fit_transform(doc_topic))
+    doc_topic_tsne.reset_index(drop=True, inplace=True)
+    df1 = pd.concat([doc_topic_tsne, df_full[['translator','title']]], axis=1)
+    fig = go.Figure()
+    for translator, gr in df1.groupby('translator'):
+        fig.add_trace(go.Scatter(x=gr[0], y=gr[1], name=translator, mode='markers',
+                        hovertext= gr['title'], marker={'opacity':.1}))  #, marker=[opacity=.2]))  # [df_full[['title', 'year_published', 'ch_idx']]])
+
+    plot(fig, filename='graphs/test_7.html')
+
+    # predictions
+
+    for n in np.linspace(30,70,10):
+        lsa = TruncatedSVD(int(n))
+        doc_topic = lsa.fit_transform(X_tfidf)
+        df2 = pd.concat([pd.DataFrame(doc_topic), df_full[['translator', 'title']]], axis=1)
+        test_title_list = []
+        train_title_list = []
+        for title, df_2 in df2.groupby('title'):
+            if 'Elephant' in title:
+                globals()[str(title).replace(' ', '_')] = df_2
+                test_title_list.append(globals()[str(title).replace(' ', '_')])
+            else:
+                globals()[str(title).replace(' ', '_')] = df_2
+                train_title_list.append(globals()[str(title).replace(' ', '_')])
+        test_df = pd.concat(test_title_list, axis=0)
+        train_df = pd.concat(train_title_list, axis=0)
+        gbc = GradientBoostingClassifier(random_state=42, verbose=1)
+        gbc.fit(train_df.drop(['translator','title'], axis=1),train_df['translator'])
+        print(f'LSA with n: {n}')
+        print(classification_report(test_df['translator'],
+                              gbc.predict(test_df.drop(['translator','title'], axis=1))))
+
+    # logit = LogisticRegressionCV(penalty='elasticnet', n_jobs=-1, random_state=42, verbose=1)
+    # logit.fit()
+
+
+
+
 
 
 
@@ -159,4 +212,4 @@ def main_word_proc(book_idx):
 
 
 if __name__ == '__main__':
-    df, target = test_two()
+    df2 = test_two()
