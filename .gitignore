@@ -104,3 +104,8 @@ venv.bak/
 .mypy_cache/
 .idea
 data
+/notebooks/pairs_8_15.ipynb
+/notebooks/Untitled.ipynb
+notebooks/
+
+graphs/
