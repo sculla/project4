@@ -20,7 +20,21 @@ from sklearn.linear_model import LogisticRegressionCV
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics.classification import classification_report
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.linear_model import SGDClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+import pandas as pd
+from sklearn.model_selection import train_test_split
 
+
+
+class data():
+    def __init__(self):
+        self.Data = pd.DataFrame()
+        self.Target = pd.DataFrame()
+        self.Title = pd.DataFrame()
 
 def test_two():
     books = [
@@ -82,12 +96,6 @@ def test_two():
 
     # logit = LogisticRegressionCV(penalty='elasticnet', n_jobs=-1, random_state=42, verbose=1)
     # logit.fit()
-
-
-
-
-
-
 
 def test_one():
     books = [
@@ -210,6 +218,52 @@ def main_word_proc(book_idx):
     nn = NearestNeighbors(metric='cosine', algorithm='brute')
     return nn.fit(word_vecs), countvect, feature_names, word_vecs
 
+def run_presentation(early=False):
+
+    books = [
+        'data/Dance Dance Dance_df.pkl',
+        'data/Norwegian Wood_df.pkl',
+        'data/The Elephant Vanishes_df.pkl',
+        'data/Wild Sheep Chase_df.pkl']
+    books_df = []
+    for idx, book in enumerate(books):
+        books_df.append(pd.read_pickle(book))
+    df = pd.concat(books_df, axis=0)
+
+
+    book_data = data()
+
+    book_data.Data, book_data.Target, book_data.Title = df['text'], df['translator'], df['title']
+    print(book_data.Data.shape)
+    print(book_data.Target.shape)
+
+    tfidf = TfidfVectorizer(max_df=0.5, max_features=10000, ngram_range=(1,2), norm='l1',use_idf=True)
+    sgd = TruncatedSVD(60) # (tol=1e-3, alpha=1e-06, max_iter=80, penalty='elasticnet')
+    tsne = TSNE(n_components=2, perplexity=40,n_iter_without_progress=50, verbose=1)
+    y = book_data.Target.values
+    X = tfidf.fit_transform(book_data.Data.values)
+    X_1 = sgd.fit_transform(X)
+    if early:
+        return X_1, y
+    X_2 = tsne.fit_transform(X_1)
+    return X_2,y
+
+def pretty_graph(x,y):
+    df_x = pd.DataFrame(x)
+    df_y = pd.DataFrame(y, columns=['translator'])
+    df1 = pd.concat([df_x, df_y], axis=1)
+    fig = go.Figure()
+    for translator, gr in df1.groupby('translator'):
+        fig.add_trace(go.Scatter(x=gr[0], y=gr[1], name=translator, mode='markers', marker={
+            'opacity': .1}))
+    plot(fig, filename='graphs/test_10.html')
+
 
 if __name__ == '__main__':
-    df2 = test_two()
+    #pretty_graph(run_presentation())
+    x, y = run_presentation(True)
+    x_tr, x_te, y_tr, y_te = train_test_split(x,y, random_state=42, shuffle=True, train_size=.75, stratify=y )
+    gbc = GradientBoostingClassifier(random_state=42, verbose=1, n_estimators=10000, max_depth=10, n_iter_no_change=500)
+    gbc.fit(x_tr, y_tr)
+    print(classification_report(y_te,gbc.predict(x_te)))
+
