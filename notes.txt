@@ -32,3 +32,11 @@ Best parameters set:
                         hovertext= gr['title'], marker={'opacity':.1}))  #, marker=[opacity=.2]))  # [df_full[['title', 'year_published', 'ch_idx']]])
 
     plot(fig, filename='graphs/test_7.html')
+
+
+                 precision    recall  f1-score   support
+Alfred Birnbaum       0.73      0.90      0.81      2086
+      Jay Rubin       0.66      0.37      0.48      1083
+       accuracy                           0.72      3169
+      macro avg       0.70      0.64      0.64      3169
+   weighted avg       0.71      0.72      0.70      3169

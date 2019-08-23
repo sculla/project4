@@ -27,6 +27,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from textwrap import wrap
 
 
 
@@ -35,6 +36,7 @@ class data():
         self.Data = pd.DataFrame()
         self.Target = pd.DataFrame()
         self.Title = pd.DataFrame()
+        self.Text = pd.DataFrame()
 
 def test_two():
     books = [
@@ -218,13 +220,15 @@ def main_word_proc(book_idx):
     nn = NearestNeighbors(metric='cosine', algorithm='brute')
     return nn.fit(word_vecs), countvect, feature_names, word_vecs
 
-def run_presentation(early=False):
+
+def run_presentation(early=False, n=10):
 
     books = [
         'data/Dance Dance Dance_df.pkl',
         'data/Norwegian Wood_df.pkl',
         'data/The Elephant Vanishes_df.pkl',
-        'data/Wild Sheep Chase_df.pkl']
+        'data/Wild Sheep Chase_df.pkl'
+    ]
     books_df = []
     for idx, book in enumerate(books):
         books_df.append(pd.read_pickle(book))
@@ -233,37 +237,77 @@ def run_presentation(early=False):
 
     book_data = data()
 
-    book_data.Data, book_data.Target, book_data.Title = df['text'], df['translator'], df['title']
+    book_data.Data, book_data.Target = df['text'], df['translator']
+    book_data.Text, book_data.Title = df['text'], df['title']
     print(book_data.Data.shape)
     print(book_data.Target.shape)
 
-    tfidf = TfidfVectorizer(max_df=0.5, max_features=10000, ngram_range=(1,2), norm='l1',use_idf=True)
-    sgd = TruncatedSVD(60) # (tol=1e-3, alpha=1e-06, max_iter=80, penalty='elasticnet')
+    tfidf = TfidfVectorizer(ngram_range=(1,4), norm='l2',use_idf=True, min_df=10, sublinear_tf=True) # ,max_df=0.5, max_features=10000)
+    sgd = TruncatedSVD(int(n)) # (tol=1e-3, alpha=1e-06, max_iter=80, penalty='elasticnet')
     tsne = TSNE(n_components=2, perplexity=40,n_iter_without_progress=50, verbose=1)
     y = book_data.Target.values
     X = tfidf.fit_transform(book_data.Data.values)
     X_1 = sgd.fit_transform(X)
     if early:
-        return X_1, y
+        return X_1, y, book_data.Text, book_data.Title
     X_2 = tsne.fit_transform(X_1)
-    return X_2,y
+    return X_2, y, df['text'], df['title']
 
-def pretty_graph(x,y):
-    df_x = pd.DataFrame(x)
-    df_y = pd.DataFrame(y, columns=['translator'])
-    df1 = pd.concat([df_x, df_y], axis=1)
-    fig = go.Figure()
-    for translator, gr in df1.groupby('translator'):
-        fig.add_trace(go.Scatter(x=gr[0], y=gr[1], name=translator, mode='markers', marker={
-            'opacity': .1}))
-    plot(fig, filename='graphs/test_10.html')
 
+# def pretty_graph(x,y,text,title):
+#     concat_list = [x,y,text,title]
+#     full_df = pd.concat(concat_list,axis=0, names=[0,1,'translator','text','title'])
+#     tr_set = []
+#     te_set = []
+#     for title in df.title.values:
+#         if 'Elephant' in title:
+#             te_set.append(full_df[full_df['title'] == title])
+#         else:
+#             tr_set.append(full_df[full_df['title'] == title])
+#     te_df = pd.concat(te_set, axis=1)
+#     tr_df = pd.concat(tr_set, axis=1)
+#     # df_x = pd.DataFrame(x)
+#     # df_y = pd.DataFrame(y, columns=['translator'])
+#     # df1 = pd.concat([df_x, df_y], axis=1)
+#     fig = go.Figure()
+#     text_list = list(map(lambda x_line: '<br>'.join(wrap(x_line,50)),tr_df.text.values))
+#     for translator, gr in tr_df.groupby('translator'):
+#         fig.add_trace(go.Scatter(x=gr[0], y=gr[1], name=translator, mode='markers',
+#                                  marker={'opacity': .3}, hovertext=text_list))
+#     plot(fig, filename='graphs/test_12.html')
 
 if __name__ == '__main__':
-    #pretty_graph(run_presentation())
-    x, y = run_presentation(True)
-    x_tr, x_te, y_tr, y_te = train_test_split(x,y, random_state=42, shuffle=True, train_size=.75, stratify=y )
+    # pretty_graph(*run_presentation())
+    # pretty_graph(run_presentation())
+    n_top = 60
+    x, y, text, title = run_presentation(True, n=n_top)
+    textdf = pd.DataFrame(text)
+    titledf = pd.DataFrame(title)
+    df_x = pd.DataFrame(x)
+    df_y = pd.DataFrame(y, columns=['translator'])
+    # title.reset_index(drop=True,inplace=True)
+    # text.reset_index(drop=True, inplace=True)
+    concat_list = [df_x,df_y,textdf,titledf]
+    for df in concat_list:
+        df.reset_index(drop=True, inplace=True)
+    full_df = pd.concat(concat_list,axis=1)
+    tr_set = []
+    te_set = []
+    full_df = full_df[full_df['title'] != np.nan]
+    for title in full_df.title.values:
+        if 'Elephant' in title:
+            te_set.append(full_df[full_df['title'] == title])
+        else:
+            tr_set.append(full_df[full_df['title'] == title])
+    te_df = pd.concat(te_set, axis=1)
+    tr_df = pd.concat(tr_set, axis=1)
+    x_tr = tr_df[[0,1]]
+    y_tr = tr_df['translator']
+    x_te = te_df[[0,1]]
+    y_te = te_df['translator']
+    #x_tr, x_te, y_tr, y_te = train_test_split(x,y, random_state=42, shuffle=True, train_size=.75, stratify=y )
     gbc = GradientBoostingClassifier(random_state=42, verbose=1, n_estimators=10000, max_depth=10, n_iter_no_change=500)
     gbc.fit(x_tr, y_tr)
+    print(n_top)
     print(classification_report(y_te,gbc.predict(x_te)))
 
